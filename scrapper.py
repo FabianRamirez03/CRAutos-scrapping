@@ -43,7 +43,6 @@ def get_to_all_cars_list(driver):
 
 
 def process_current_view_cars(driver):
-
     # Obtener todos los contenedores de vehículos
     vehicle_cards = driver.find_elements(By.CSS_SELECTOR, ".card")
 
@@ -60,18 +59,58 @@ def process_current_view_cars(driver):
         vehicle_details = capture_vehicle_details(driver)
         vehicle_details["URL"] = link
 
-        save_vehicle_details(vehicle_details)
         marca = vehicle_details.get("Marca")
         modelo = vehicle_details.get("Modelo")
         año = vehicle_details.get("Año")
-        print(f"Save {marca}-{modelo}-{año}")
-        # break
+
+        if vehicle_exists(link):
+            print(f"{marca}-{modelo}-{año} already exists on the Database")
+            populate_date_exited(link)
+        else:
+            print(f"Saving {marca}-{modelo}-{año}")
+            save_vehicle_details(vehicle_details)
 
         # Cerrar la pestaña actual
         driver.close()
 
         # Regresar a la pestaña original
         driver.switch_to.window(driver.window_handles[0])
+
+
+def vehicle_exists(url):
+    try:
+        with pyodbc.connect(
+            driver="SQL Server",
+            server="FABIAN\SQLEXPRESS",
+            database="CRAutos",
+            trusted_connection="yes",
+        ) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM Cars WHERE URL = ?", url)
+            count = cursor.fetchone()[0]
+            return count > 0
+    except pyodbc.Error as e:
+        print(f"Error connecting to the database: {e}")
+        return False
+
+
+def populate_date_exited(url):
+    try:
+        with pyodbc.connect(
+            driver="SQL Server",
+            server="FABIAN\SQLEXPRESS",
+            database="CRAutos",
+            trusted_connection="yes",
+        ) as conn:
+            cursor = conn.cursor()
+            today = datetime.now().strftime("%Y-%m-%d")
+            cursor.execute(
+                "UPDATE Cars SET DateExited = ? WHERE URL = ? AND DateExited IS NULL",
+                (today, url),
+            )
+            conn.commit()
+    except pyodbc.Error as e:
+        print(f"Error connecting to the database: {e}")
 
 
 def capture_vehicle_details(driver):
