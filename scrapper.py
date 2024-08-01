@@ -28,7 +28,18 @@ def main():
 
     get_to_all_cars_list(driver)
 
-    process_current_view_cars(driver)
+    while True:
+        process_current_view_cars(driver)
+        try:
+            next_button = driver.find_element(
+                By.CSS_SELECTOR, ".page-item.page-next .page-link"
+            )
+
+            driver.execute_script("arguments[0].click();", next_button)
+
+            time.sleep(1)
+        except NoSuchElementException:
+            break
 
     driver.quit()
 
@@ -64,10 +75,8 @@ def process_current_view_cars(driver):
         año = vehicle_details.get("Año")
 
         if vehicle_exists(link):
-            print(f"{marca}-{modelo}-{año} already exists on the Database")
             populate_date_exited(link)
         else:
-            print(f"Saving {marca}-{modelo}-{año}")
             save_vehicle_details(vehicle_details)
 
         # Cerrar la pestaña actual
