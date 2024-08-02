@@ -26,7 +26,6 @@ CREATE TABLE Cars (
     NegotiablePrice VARCHAR(10),        -- Indicates if the price is negotiable
     AcceptsVehicle VARCHAR(10),         -- Indicates if another vehicle is accepted
     Province VARCHAR(50),               -- Province where the vehicle is located
-    TransferCost DECIMAL(18, 2),       -- Cost of transfer
     Notes VARCHAR(255),                 -- Additional notes about the vehicle
     DateEntered DATE  NOT NULL,                   -- Date of entry of the vehicle record
     DateExited DATE,                    -- Date of exit of the vehicle record

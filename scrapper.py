@@ -9,39 +9,73 @@ from selenium.common.exceptions import (
 )
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 import time
 import pyodbc
 import re
 from datetime import datetime
 import locale
+import logging
+import logging.config
 
 # GLOBALS
 
 CRAUTOS_BASE_PATH = "https://crautos.com/index.cfm"
-locale.setlocale(locale.LC_TIME, "es_CR.UTF-8")  # Para Costa Rica
+locale.setlocale(locale.LC_TIME, "es_CR.UTF-8")  # Costa Rica
+
+current_date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(f"logs\\car_scraper_{current_date}.log"),
+        logging.StreamHandler(),
+    ],
+)
+
+
+logger = logging.getLogger(__name__)
+
+existing_vehicle_urls = []
 
 
 def main():
+    global existing_vehicle_urls
+
+    logger.info("Starting the scraper.")
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
 
-    driver.get(CRAUTOS_BASE_PATH)
+    try:
+        driver.get(CRAUTOS_BASE_PATH)
+        logger.info("Navigated to base URL.")
 
-    get_to_all_cars_list(driver)
+        get_to_all_cars_list(driver)
+        logger.info("Navigated to the list of all cars.")
 
-    while True:
-        process_current_view_cars(driver)
-        try:
-            next_button = driver.find_element(
-                By.CSS_SELECTOR, ".page-item.page-next .page-link"
-            )
+        page_index = 0
 
-            driver.execute_script("arguments[0].click();", next_button)
+        existing_vehicle_urls = get_existing_vehicle_urls()
 
-            time.sleep(1)
-        except NoSuchElementException:
-            break
-
-    driver.quit()
+        while True:
+            process_current_view_cars(driver)
+            try:
+                next_button = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable(
+                        (By.CSS_SELECTOR, ".page-item.page-next .page-link")
+                    )
+                )
+                driver.execute_script("arguments[0].click();", next_button)
+                page_index += 1
+                logger.info(f"Clicked the next page button. Going to page {page_index}")
+            except TimeoutException:
+                logger.info("No more pages left to process.")
+                break
+    except Exception as e:
+        logger.error(f"An error occurred: {e}")
+    finally:
+        driver.quit()
+        logger.info("Closed the web driver.")
 
 
 def get_to_all_cars_list(driver):
@@ -54,36 +88,67 @@ def get_to_all_cars_list(driver):
 
 
 def process_current_view_cars(driver):
-    # Obtener todos los contenedores de vehículos
-    vehicle_cards = driver.find_elements(By.CSS_SELECTOR, ".card")
+    global existing_vehicle_urls
 
-    for card in vehicle_cards:
-        # Encontrar el enlace del vehículo
-        link = card.find_element(By.TAG_NAME, "a").get_attribute("href")
+    logger.info("Processing current view of cars.")
+    try:
+        vehicle_cards = WebDriverWait(driver, 10).until(
+            EC.visibility_of_all_elements_located((By.CSS_SELECTOR, ".card"))
+        )
+        logger.info(f"Found {len(vehicle_cards)} vehicle cards.")
+    except Exception as e:
+        logger.error(f"An error occurred while processing vehicle card: {e}")
 
-        # Abrir el enlace en una nueva pestaña
-        driver.execute_script("window.open(arguments[0]);", link)
+    for index, card in enumerate(vehicle_cards):
+        # Ignorar el último elemento
+        if index == len(vehicle_cards) - 1:
+            continue
+        try:
+            # Encontrar el enlace del vehículo
+            link = card.find_element(By.TAG_NAME, "a").get_attribute("href")
+            logger.info(f"Found vehicle link: {link}")
 
-        # Cambiar al nuevo contexto de la pestaña
-        driver.switch_to.window(driver.window_handles[1])
+            # Verificar si el URL ya existe en la base de datos
+            if link in existing_vehicle_urls:
+                logger.info(
+                    f"Vehicle link {link} already exists in the database. Skipping."
+                )
+                continue
 
-        vehicle_details = capture_vehicle_details(driver)
-        vehicle_details["URL"] = link
+            # Abrir el enlace en una nueva pestaña
+            driver.execute_script("window.open(arguments[0]);", link)
+            logger.info("Opened vehicle link in a new tab.")
 
-        marca = vehicle_details.get("Marca")
-        modelo = vehicle_details.get("Modelo")
-        año = vehicle_details.get("Año")
+            # Cambiar al nuevo contexto de la pestaña
+            driver.switch_to.window(driver.window_handles[1])
+            logger.info("Switched to new tab.")
 
-        if vehicle_exists(link):
-            populate_date_exited(link)
-        else:
-            save_vehicle_details(vehicle_details)
+            vehicle_details = capture_vehicle_details(driver)
 
-        # Cerrar la pestaña actual
-        driver.close()
+            vehicle_details["URL"] = link
 
-        # Regresar a la pestaña original
-        driver.switch_to.window(driver.window_handles[0])
+            marca = vehicle_details.get("Marca")
+            modelo = vehicle_details.get("Modelo")
+            año = vehicle_details.get("Año")
+            logger.info(f"Captured details for vehicle: {marca} {modelo} {año}")
+
+            if vehicle_exists(link):
+                populate_date_exited(link)
+                logger.info(f"Updated exit date for existing vehicle: {link}")
+            else:
+                save_vehicle_details(vehicle_details)
+                logger.info(f"Saved new vehicle details: {link}")
+
+            # Cerrar la pestaña actual
+            driver.close()
+            logger.info("Closed current tab.")
+
+            # Regresar a la pestaña original
+            driver.switch_to.window(driver.window_handles[0])
+            logger.info("Switched back to original tab.")
+
+        except Exception as e:
+            logger.error(f"An error occurred while processing vehicle card: {e}")
 
 
 def vehicle_exists(url):
@@ -99,7 +164,7 @@ def vehicle_exists(url):
             count = cursor.fetchone()[0]
             return count > 0
     except pyodbc.Error as e:
-        print(f"Error connecting to the database: {e}")
+        logger.error(f"Error connecting to the database: {e}")
         return False
 
 
@@ -119,11 +184,12 @@ def populate_date_exited(url):
             )
             conn.commit()
     except pyodbc.Error as e:
-        print(f"Error connecting to the database: {e}")
+        logger.error(f"Error connecting to the database: {e}")
 
 
 def capture_vehicle_details(driver):
     # Un diccionario para almacenar los detalles del vehículo
+    logger.info("Capturing vehicle details.")
     vehicle_details = {}
 
     # Lista de campos que queremos capturar
@@ -142,53 +208,131 @@ def capture_vehicle_details(driver):
         "Precio negociable",
         "Se recibe vehículo",
         "Provincia",
-        "Traspaso",
         "Fecha de ingreso",
     ]
 
     try:
-        # Capturar los campos de la tabla
         for field in fields:
-            # Intentar encontrar el elemento correspondiente
             element = driver.find_element(
                 By.XPATH, f"//td[contains(text(), '{field}')]/following-sibling::td"
             )
             vehicle_details[field] = element.text.strip()
 
-        # Capturar la marca, modelo, año y precios
         header_element = driver.find_element(By.CSS_SELECTOR, ".carheader")
         header_text = header_element.find_elements(By.TAG_NAME, "h1")
 
-        # Obtener la información de la marca, modelo y año
         if header_text:
-            # El primer h1 es la marca y modelo, el segundo h1 es el precio en colones
             brand_model_year = header_text[0].text.strip()
-            price_colones = header_text[1].text.strip()
-
-            # Separar marca y modelo
             brand_model = brand_model_year.split()
             if len(brand_model) >= 2:
-                vehicle_details["Marca"] = brand_model[0]  # Marca
-                vehicle_details["Modelo"] = " ".join(
-                    brand_model[1:-1]
-                )  # Modelo (todo excepto el año)
-                vehicle_details["Año"] = brand_model[-1]  # Año
+                vehicle_details["Marca"] = brand_model[0]
+                vehicle_details["Modelo"] = " ".join(brand_model[1:-1])
+                vehicle_details["Año"] = brand_model[-1]
 
-            # Reformatear precio en colones
-            vehicle_details["PrecioColones"] = int(
-                price_colones.replace("¢", "").replace(",", "").strip()
-            )
+        # Capturar precios en colones y dólares utilizando las nuevas funciones
+        price_colones = extract_price_colones(header_element)
+        if price_colones is not None:
+            vehicle_details["PrecioColones"] = price_colones
 
-        # Capturar el precio en dólares (el tercer h3)
-        price_dolares = header_element.find_element(By.XPATH, ".//h3").text.strip()
-        vehicle_details["PrecioDolares"] = int(
-            price_dolares.replace("($ ", "").replace(")*", "").replace(",", "").strip()
-        )
+        price_dolares = extract_price_dolares(header_element)
+        if price_dolares is not None:
+            vehicle_details["PrecioDolares"] = price_dolares
 
     except NoSuchElementException:
-        print(f"Missing vehicle information.")
+        logger.error(f"Missing vehicle information.")
+    except TimeoutException:
+        logger.error(f"TimeOut Exception.")
+
+    logger.info("Vehicle details captured.")
 
     return reformat_vehicle_details(vehicle_details)
+
+
+def extract_price_colones(header_element):
+    logger.info("Extracting price in colones from header element.")
+
+    # Buscar todos los elementos h1 y h3 dentro del div
+    price_elements = header_element.find_elements(
+        By.TAG_NAME, "h1"
+    ) + header_element.find_elements(By.TAG_NAME, "h3")
+
+    logger.info(
+        f"Found {len(price_elements)} price elements: {[element.text for element in price_elements]}"
+    )
+
+    # Filtrar los elementos que contienen precios en colones
+    colones_prices = []
+    for element in price_elements:
+        text = element.text.strip()
+        if text.startswith("¢"):
+            colones_price = int(text.replace("¢", "").replace(",", "").strip())
+            colones_prices.append(colones_price)
+            logger.info(f"Found colones price: {colones_price}")
+
+    # Si hay varios precios en colones, devolver el más bajo
+    if colones_prices:
+        min_price = min(colones_prices)
+        logger.info(f"Lowest colones price found: {min_price}")
+        return min_price
+    else:
+        logger.warning("No colones prices found.")
+        return None
+
+
+def extract_price_dolares(header_element):
+    logger.info("Extracting price in dollars from header element.")
+
+    price_elements = header_element.find_elements(
+        By.TAG_NAME, "h1"
+    ) + header_element.find_elements(By.TAG_NAME, "h3")
+
+    logger.info(
+        f"Found {len(price_elements)} price elements: {[element.text for element in price_elements]}"
+    )
+
+    # Filtrar los elementos que contienen precios en dólares
+    for element in price_elements:
+        text = element.text.strip()
+        if text.startswith("($"):
+            dolares_price = int(
+                text.replace("($", "").replace(")*", "").replace(",", "").strip()
+            )
+            logger.info(f"Found dollar price: {dolares_price}")
+            return dolares_price
+
+    # Si no se encuentra ningún precio en dólares, devolver None
+    logger.warning("No dollar prices found.")
+    return None
+
+
+def get_existing_vehicle_urls():
+    existing_urls = []
+
+    try:
+        with pyodbc.connect(
+            driver="SQL Server",
+            server="FABIAN\SQLEXPRESS",
+            database="CRAutos",
+            trusted_connection="yes",
+        ) as conn:
+            cursor = conn.cursor()
+
+            # Ejecutar la consulta
+            cursor.execute("SELECT URL FROM Cars")
+
+            # Obtener los resultados
+            rows = cursor.fetchall()
+            for row in rows:
+                existing_urls.append(row.URL)
+
+            # Cerrar la conexión
+            cursor.close()
+            conn.close()
+
+    except pyodbc.Error as e:
+        logger.error(f"Database error: {e}")
+
+    return existing_urls
 
 
 def save_vehicle_details(vehicle_details):
@@ -211,8 +355,8 @@ def save_vehicle_details(vehicle_details):
                     Transmission, Condition, Mileage,
                     ExteriorColor, InteriorColor, Doors, TaxesPaid,
                     NegotiablePrice, AcceptsVehicle, Province,
-                    TransferCost, Notes, DateEntered, DateExited, URL
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    Notes, DateEntered, DateExited, URL
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 (
                     vehicle_details.get("Marca"),
@@ -234,7 +378,6 @@ def save_vehicle_details(vehicle_details):
                     vehicle_details.get("Precio negociable"),
                     vehicle_details.get("Se recibe vehículo"),
                     vehicle_details.get("Provincia"),
-                    vehicle_details.get("Traspaso"),
                     vehicle_details.get(
                         "Notas", ""
                     ),  # Use an empty string if "Notas" not present
@@ -248,7 +391,7 @@ def save_vehicle_details(vehicle_details):
             conn.commit()
 
     except pyodbc.Error as e:
-        print(f"Error connecting to the database: {e}")
+        logger.error(f"Error connecting to the database: {e}")
 
 
 def reformat_vehicle_details(vehicle_details):
@@ -364,9 +507,9 @@ def press_search_button(driver):
 
 
 def custom_sleep(sleep_time):
-    print(f"Sleeping {sleep_time} seconds.")
+    logger.debug(f"Sleeping {sleep_time} seconds.")
     time.sleep(sleep_time)
-    print(f"I had slept {sleep_time} seconds.")
+    logger.debug(f"I had slept {sleep_time} seconds.")
 
 
 def print_dict(dictionary):

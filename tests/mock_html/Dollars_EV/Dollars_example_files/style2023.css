@@ -1,0 +1,635 @@
+<style type="text/css">
+
+.carfeature {
+	font-family: Oxygen;
+	font-size: 13px;
+	font-weight: 400;
+	color: #000;
+	padding-left: 0px;
+}
+.brandtitle1 {
+	font-family: Oxygen;
+	font-size: 14px;
+	font-weight: 600;
+	color: #000000;
+}
+.brandtitle {
+	font-family: Oxygen;
+	font-size: 16px;
+	font-weight: 400;
+	color: #000000;
+}
+.brandtitle2 {
+	font-family: Oxygen;
+	font-size: 16px;
+	font-weight: 400;
+	color: #FFFFFF;
+}
+.modeltitle {
+	font-family: Oxygen;
+	font-size: 14px;
+	font-weight: 600;
+	color: #232323;
+	padding-left: 5px;
+	line-height: 15px;
+}
+.modeltitle-small {
+	font-family: Oxygen;
+	font-size: 12px;
+	font-weight: 600;
+	color: #232323;
+	padding-left: 5px;
+	line-height: 15px;
+}
+.modeltitle-smallest {
+	font-family: Oxygen;
+	font-size: 10px;
+	font-weight: 600;
+	color: #232323;
+	padding-left: 5px;
+	line-height: 15px;
+}
+.seller {
+	font-family: Oxygen;
+	font-size: 12px;
+	color:#C00;
+	font-weight: 600;
+}
+.precio {
+	font-family: Oxygen;
+	font-size: 16px;
+	font-weight: 600;
+	color: #AA0000;
+	line-height: 16px;
+}
+.preciodolares {
+	font-size: 14px;
+	font-weight: 400;
+	color: #000000;
+	line-height: 14px;
+}
+.marqueefont {
+	font-size: 14px;
+	font-weight: 400;
+	color: #555555;
+	line-height: 12px;
+}
+.mainhlcar {
+	background-color: #FFF382;
+}
+.dealerhlcar {
+	background-color: #EFEFEF;
+}
+.header-image {
+	background-size: cover;
+}
+.searchform {
+	border: 1px solid #e5e5e5;
+	-moz-border-radius: 11px / 13px;
+	-webkit-border-radius: 11px / 13px;
+	border-radius: 11px / 13px;
+	-moz-background-clip: padding;
+	-webkit-background-clip: padding-box;
+	background-clip: padding-box;
+	background-color: #efefef;
+	-moz-box-shadow: 0 0 5px rgba(0,0,0,.13);
+	-webkit-box-shadow: 0 0 5px rgba(0,0,0,.13);
+	box-shadow: 0 0 5px rgba(0,0,0,.13);
+	margin-bottom: 20px;
+  margin-top: 20px;
+	padding-left: 0px;
+	padding-right: 0px;
+	padding-top: 10px;
+	padding-bottom: 10px;
+	font-family: Oxygen;
+	font-size: 16px;
+  color: #000;
+}
+.searchform:hover {
+	background-image: -moz-linear-gradient(bottom, #dedede 0%, #f9f9f9 50%);
+	background-image: -o-linear-gradient(bottom, #dedede 0%, #f9f9f9 50%);
+	background-image: -webkit-linear-gradient(bottom, #dedede 0%, #f9f9f9 50%);
+	background-image: linear-gradient(bottom, #dedede 0%, #f9f9f9 50%);
+}
+.mytext1 {
+	font-family: Oxygen;
+	font-style: normal;
+	color: #000000;
+	font-size: 14px;
+	line-height: 16px;
+	text-decoration: none;
+}
+A.mytext1:link {
+	color: #0;
+	text-decoration: none;
+}
+A.mytext1:hover {
+	text-decoration: none;
+}
+A.mytext1:visited {
+	color: #0;
+	text-decoration: none;
+}
+A.mytext1:visited:hover {
+	text-decoration: none;
+}
+.mytext1b {
+	font-family: Oxygen;
+	font-style: normal;
+	color: #307E1D;
+	font-size: 13px;
+	text-decoration: none;
+}
+A.mytext1b:link {
+	color: #0C;
+	text-decoration: none;
+}
+A.mytext1b:hover {
+	text-decoration: none;
+}
+A.mytext1b:visited {
+	color: #0C;
+	text-decoration: none;
+}
+A.mytext1b:visited:hover {
+	text-decoration: none;
+}
+.transtitle {
+	font-family: Oxygen;
+	font-style: normal;
+	color: #000000;
+	font-size: 11px;
+	text-decoration: none;
+}
+A.transtitle:link {
+	color: #000000;
+	text-decoration: none;
+}
+A.transtitle:hover {
+	text-decoration: none;
+}
+A.transtitle:visited {
+	color: #007700;
+	text-decoration: none;
+}
+A.transtitle:visited:hover {
+	text-decoration: none;
+}
+.carbox {
+	margin-bottom: 10px;
+	background-color: #FFFFFF;
+	border-width:3px;
+	border-color:#FFCE3C;
+}
+.sdcarbox {
+	margin-bottom: 10px;
+	border-width:3px;
+	border-color:#FFCE3C;
+}
+.carbox-regular {
+	margin-bottom: 10px;
+	background-color: #FFFFFF;
+	border-width:3px;
+	border-color:#454545;
+}
+.carbox-green {
+	margin-bottom: 10px;
+	background-color: #FFFFFF;
+	border-width:3px;
+	border-color:#008800;
+}
+.carbox-orange {
+	margin-bottom: 10px;
+	background-color: #FFFFFF;
+	border-width:3px;
+	border-color:#BD4700;
+}
+.carbox-dealer {
+	margin-bottom: 10px;
+	background-color: #FFFFFF;
+	border-width:3px;
+	border-color:#2D77C5;
+}
+.lowbox{
+	height: 280px;
+}
+.highbox {
+	height: 315px;
+}
+.highbox-dealer {
+	height: 330px;
+}
+.whitefont {
+	color: #FFFFFF;
+}
+.yellowfont {
+	color:#E9E10E;
+}
+div.inventory-main-yellow {
+	border: 2px solid #FFCE3C;
+	-moz-border-radius: 4px / 6px;
+	-webkit-border-radius: 4px / 6px;
+	border-radius: 4px / 6px;
+	-moz-background-clip: padding;
+	-webkit-background-clip: padding-box;
+	background-clip: padding-box;
+	background-color: #FFCE3C;
+	-moz-box-shadow: 0 0 5px rgba(0,0,0,.13);
+	-webkit-box-shadow: 0 0 5px rgba(0,0,0,.13);
+	box-shadow: 0 0 5px rgba(0,0,0,.13);
+	margin-bottom: 20px;
+	font-family: Oxygen;
+}
+div.inventory-main-blue {
+	border: 2px solid #0058A5;
+	-moz-border-radius: 4px / 6px;
+	-webkit-border-radius: 4px / 6px;
+	border-radius: 4px / 6px;
+	-moz-background-clip: padding;
+	-webkit-background-clip: padding-box;
+	background-clip: padding-box;
+	background-color: #0058A5;
+	-moz-box-shadow: 0 0 5px rgba(0,0,0,.13);
+	-webkit-box-shadow: 0 0 5px rgba(0,0,0,.13);
+	box-shadow: 0 0 5px rgba(0,0,0,.13);
+	margin-bottom: 20px;
+	font-family: Oxygen;
+}
+div.inventory-main-grey {
+	border: 2px solid #565656;
+  background-color: whitesmoke;
+	-moz-border-radius: 10px / 12px;
+	-webkit-border-radius: 10px / 12px;
+	border-radius: 10px / 12px;
+	-moz-background-clip: padding;
+	-webkit-background-clip: padding-box;
+	background-clip: padding-box;
+	background-color: #EFEFEF;
+	-moz-box-shadow: 0 0 5px rgba(0,0,0,.13);
+	-webkit-box-shadow: 0 0 5px rgba(0,0,0,.13);
+	box-shadow: 0 0 5px rgba(0,0,0,.13);
+	margin-bottom: 20px;
+	font-family: Oxygen;
+}
+.mytext2 {
+	font-size: 14px;
+	line-height: 18px;
+	color: #FFF;
+	font-family: Oxygen;
+}
+.mytext-table {
+	font-size: 16px;
+	line-height: 18px;
+	color: #FFF;
+	font-family: Oxygen;
+}
+
+
+
+
+.carmodel {
+	font-family: Oxygen;
+	font-size: 14px;
+	font-weight: 400;
+	color: #000000;
+	padding-left: 5px;
+	line-height: 17px;
+}
+.preciodesde {
+	font-size: 12px;
+	font-weight: 400;
+	color: #000000;
+	line-height: 12px;
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+.preciomodelos {
+	font-size: 15px;
+	font-weight: 400;
+	color: #000000;
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+
+.cardetail {
+	font-family: Oxygen;
+	font-size: 17px;
+	font-weight: 600;
+	color: #000000;
+}
+
+.horizontalMenu {
+  color: #fff;
+  font-size: 16px;
+  padding: 0;
+  float: right;
+  display: block;
+}
+
+.brand {
+	border: 0px solid #e5e5e5;
+	-moz-border-radius: 10px / 10px;
+	-webkit-border-radius: 10px / 10px;
+	border-radius: 10px / 10px;
+	-moz-background-clip: padding;
+	-webkit-background-clip: padding-box;
+	background-clip: padding-box;
+	background-color: #efefef;
+	-moz-box-shadow: 0 0 5px rgba(0,0,0,.13);
+	-webkit-box-shadow: 0 0 5px rgba(0,0,0,.13);
+	box-shadow: 0 0 5px rgba(0,0,0,.13);
+	margin-bottom: 20px;
+	margin-left: 5px;
+	font-family: Oxygen;
+	padding-left: 0px;
+	padding-right: 0px;
+	padding-top: 0px;
+	padding-bottom: 0px;
+}
+.brand:hover {
+	background-image: -moz-linear-gradient(bottom, #dedede 0%, #f9f9f9 50%);
+	background-image: -o-linear-gradient(bottom, #dedede 0%, #f9f9f9 50%);
+	background-image: -webkit-linear-gradient(bottom, #dedede 0%, #f9f9f9 50%);
+	background-image: linear-gradient(bottom, #dedede 0%, #f9f9f9 50%);
+}
+
+.brandlogo {
+  width: 63px;
+  height: 60px;
+	margin-left: 10px;
+	margin-bottom: 10px;
+}
+
+/* Google Ad Manager banner styles*/
+.banner160x600 {
+	border: 1px solid #000000;
+	border-bottom-left-radius: 5px;
+	border-bottom-right-radius: 5px;
+	border-top-left-radius: 0px;
+	border-top-right-radius: 0px;
+	height: 602px;
+	width: 162px;
+}
+.banner160x600title {
+	font-size: 9px;
+	color:#333;
+	background-color:#DEDEDE;
+	height: 10px;
+	width: 162px;
+	line-height:10px;
+}
+.banner970x90 {
+	border: 1px solid #000000;
+	border-bottom-left-radius: 5px;
+	border-bottom-right-radius: 5px;
+	border-top-left-radius: 0px;
+	border-top-right-radius: 0px;
+	height: 92px;
+	width: 972px;
+}
+.banner970x90title {
+	font-size: 9px;
+	color:#333;
+	background-color:#DEDEDE;
+	height: 10px;
+	width: 972px;
+	line-height:10px;
+}
+.banner468x60 {
+	border: 1px solid #000000;
+	border-bottom-left-radius: 5px;
+	border-bottom-right-radius: 5px;
+	border-top-left-radius: 0px;
+	border-top-right-radius: 0px;
+	height: 62px;
+	width: 470px;
+}
+.banner468x60title {
+	font-size: 9px;
+	color:#333;
+	background-color:#DEDEDE;
+	height: 10px;
+	width: 470px;
+	line-height:10px;
+}
+.banner320x100 {
+	border: 1px solid #000000;
+	border-bottom-left-radius: 5px;
+	border-bottom-right-radius: 5px;
+	border-top-left-radius: 0px;
+	border-top-right-radius: 0px;
+	height: 102px;
+	width: 322px;
+}
+.banner320x100title {
+	font-size: 9px;
+	color:#333;
+	background-color:#DEDEDE;
+	height: 10px;
+	width: 322px;
+	line-height:10px;
+}
+.banner300x250 {
+	border: 1px solid #000000;
+	border-bottom-left-radius: 5px;
+	border-bottom-right-radius: 5px;
+	border-top-left-radius: 0px;
+	border-top-right-radius: 0px;
+	height: 252px;
+	width: 302px;
+}
+.banner300x250title {
+	font-size: 9px;
+	color:#333;
+	background-color:#DEDEDE;
+	height: 10px;
+	width: 302px;
+	line-height:10px;
+}
+.banner180x150 {
+	border: 1px solid #000000;
+	border-bottom-left-radius: 5px;
+	border-bottom-right-radius: 5px;
+	border-top-left-radius: 0px;
+	border-top-right-radius: 0px;
+	height: 152px;
+	width: 182px;
+}
+.banner180x150title {
+	font-size: 9px;
+	color:#333;
+	background-color:#DEDEDE;
+	height: 10px;
+	width: 182px;
+	line-height:10px;
+}
+.banner728x90 {
+	border: 1px solid #000000;
+	border-bottom-left-radius: 5px;
+	border-bottom-right-radius: 5px;
+	border-top-left-radius: 0px;
+	border-top-right-radius: 0px;
+	height: 92px;
+	width: 730px;
+}
+.banner728x90title {
+	font-size: 9px;
+	color:#333;
+	background-color:#DEDEDE;
+	height: 10px;
+	width: 730px;
+	line-height:10px;
+}
+.banner750x200 {
+	border: 1px solid #000000;
+	border-bottom-left-radius: 5px;
+	border-bottom-right-radius: 5px;
+	border-top-left-radius: 0px;
+	border-top-right-radius: 0px;
+	height: 202px;
+	width: 752px;
+}
+.banner750x200title {
+	font-size: 9px;
+	color:#333;
+	background-color:#DEDEDE;
+	height: 10px;
+	width: 752px;
+	line-height:10px;
+}
+
+.copyright-wrap {
+	padding: 18px 0 20px 11px;
+	background-color: #2f2f2f;
+	color: #999999;
+	font-size: 13px;
+}
+
+.copyright-wrap a {
+	color: #999;
+}
+
+.social, .f-nav {
+	float: right;
+	list-style: none;
+	padding: 0;
+	margin: 20px 0;
+}
+
+.social li {
+	float: left;
+	display: inline;
+	margin-right: 7.5px;
+	margin-bottom: 5px;
+}
+
+.social li a {
+	text-indent: -9999px;
+	width: 32px;
+	height: 32px;
+	display: block;
+	-webkit-transition: all 300ms ease-out;
+	-moz-transition: all 300ms ease-out;
+	-o-transition: all 300ms ease-out;
+	-ms-transition: all 300ms ease-out;
+	transition: all 300ms ease-out;
+}
+
+.sc-1 {
+	background: url(/images/social.png) 0px 0px no-repeat;
+}
+
+.sc-2 {
+	background: url(/images/social.png) -39px 0 no-repeat;
+}
+
+.sc-3 {
+	background: url(/images/social.png) -78px 0px no-repeat;
+}
+
+.sc-4 {
+	background: url(/images/social.png) -117px 0px no-repeat;
+}
+
+.sc-5 {
+	background: url(/images/social.png) -156px 0px no-repeat;
+}
+
+.sc-6 {
+	background: url(/images/social.png) -195px 0px no-repeat;
+}
+
+.sc-7 {
+	background: url(/images/social.png) -234px 0px no-repeat;
+}
+
+.sc-8 {
+	background: url(/images/social.png) -273px 0px no-repeat;
+}
+
+.sc-9 {
+	background: url(/images/social.png) -312px 0px no-repeat;
+}
+
+.sc-10 {
+	background: url(/images/social.png) -351px 0px no-repeat;
+}
+
+.sc-11 {
+	background: url(/images/social.png) -390px 0px no-repeat;
+}
+
+.sc-12 {
+	background: url(/images/social.png) -429px 0px no-repeat;
+}
+
+.sc-1:hover {
+	background: url(/images/social.png) 0px -32px no-repeat;
+}
+
+.sc-2:hover {
+	background: url(/images/social.png) -39px -32px no-repeat;
+}
+
+.sc-3:hover {
+	background: url(/images/social.png) -78px -32px no-repeat;
+}
+
+.sc-4:hover {
+	background: url(/images/social.png) -117px -32px no-repeat;
+}
+
+.sc-5:hover {
+	background: url(/images/social.png) -156px -32px no-repeat;
+}
+
+.sc-6:hover {
+	background: url(/images/social.png) -195px -32px no-repeat;
+}
+
+.sc-7:hover {
+	background: url(/images/social.png) -234px -32px no-repeat;
+}
+
+.sc-8:hover {
+	background: url(/images/social.png) -273px -32px no-repeat;
+}
+
+.sc-9:hover {
+	background: url(/images/social.png) -312px -32px no-repeat;
+}
+
+.sc-10:hover {
+	background: url(/images/social.png) -351px -32px no-repeat;
+}
+
+.sc-11:hover {
+	background: url(/images/social.png) -390px -32px no-repeat;
+}
+
+.sc-12:hover {
+	background: url(/images/social.png) -429px -32px no-repeat;
+}
+
+
+</style>
