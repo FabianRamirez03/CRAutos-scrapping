@@ -226,6 +226,8 @@ def process_current_view_cars(driver):
         except Exception as e:
             logger.error(f"An error occurred while processing vehicles cards view: {e}")
 
+    logger.info(f"Current length of existing_vehicle_urls {len(existing_vehicle_urls)}")
+
 
 def process_vehicle_card(driver, link):
 
@@ -492,18 +494,22 @@ def extract_price_colones(header_element):
         f"Found {len(price_elements)} price elements: {[element.text for element in price_elements]}"
     )
 
-    # Filtrar y convertir los elementos que contienen precios en colones
+    # Expresión regular para encontrar precios en colones
+    colones_price_pattern = r"¢\s*([\d,]+)(?=\s|\)|$)"  # Busca ¢ seguido de un número, delimitado por un espacio, paréntesis o fin de línea
+
     colones_prices = []
     for element in price_elements:
-        text = (
-            element.text.strip().replace("(", "").replace(")", "").replace("*", "")
-        )  # Eliminar paréntesis
-        if text.startswith("¢"):
-            colones_price = int(
-                text.replace("¢", "").replace(",", "").strip()
-            )  # Eliminar el signo de ¢ y comas
-            colones_prices.append(colones_price)
-            logger.info(f"Found colones price: {colones_price}")
+        text = element.text.strip()
+        matches = re.findall(colones_price_pattern, text)
+
+        for match in matches:
+            try:
+                # Convertir el precio encontrado a un número entero
+                colones_price = int(match.replace(",", ""))  # Eliminar comas
+                colones_prices.append(colones_price)
+                logger.info(f"Found colones price: {colones_price}")
+            except ValueError as e:
+                logger.error(f"Error converting price to int: {e}")
 
     # Si hay precios en colones, devolver el más bajo
     if colones_prices:
@@ -526,16 +532,19 @@ def extract_price_dolares(header_element):
         f"Found {len(price_elements)} price elements: {[element.text for element in price_elements]}"
     )
 
-    # Filtrar y convertir los elementos que contienen precios en dólares
+    # Expresión regular para encontrar precios en dólares
+    dolares_price_pattern = (
+        r"\$\s*([\d,]+)(?=\s|\))"  # Busca $ seguido de un número y espacio o )
+    )
+
     dolares_prices = []
     for element in price_elements:
-        text = (
-            element.text.strip().replace("(", "").replace(")", "").replace("*", "")
-        )  # Eliminar paréntesis
-        if text.startswith("$"):
-            dolares_price = int(
-                text.replace("$", "").replace(",", "").strip()
-            )  # Eliminar el signo de $ y comas
+        text = element.text.strip()
+        matches = re.findall(dolares_price_pattern, text)
+
+        for match in matches:
+            # Convertir el precio encontrado a un número entero
+            dolares_price = int(match.replace(",", ""))  # Eliminar comas
             dolares_prices.append(dolares_price)
             logger.info(f"Found dollar price: {dolares_price}")
 
