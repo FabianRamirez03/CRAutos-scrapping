@@ -2,7 +2,12 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.service import Service as ChromeService
+from selenium.webdriver.edge.service import Service as EdgeService
+from selenium.webdriver.firefox.service import Service as FirefoxService
 from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.microsoft import EdgeChromiumDriverManager
+from webdriver_manager.firefox import GeckoDriverManager
 from selenium.common.exceptions import (
     NoSuchElementException,
     ElementClickInterceptedException,
@@ -18,6 +23,7 @@ from datetime import datetime
 import locale
 import logging
 import logging.config
+import sys
 
 # GLOBALS
 
@@ -45,20 +51,27 @@ possible_brands = []
 def main():
     global existing_vehicle_urls
 
-    options = webdriver.ChromeOptions()
-    options.add_argument("enable-automation")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-extensions")
-    options.add_argument("--dns-prefetch-disable")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--window-size=1920,1080")
-    options.add_argument("--disable-infobars")
-    options.add_argument("--disable-translate")
+    # Verificar si se pasó el navegador como argumento
+    if len(sys.argv) < 2:
+        logger.warning(
+            "No web browser defined to use. Example: py scrapper.py [chrome, edge or firefox]."
+        )
+        logger.info("Setting Edge as default browser.")
+        browser = "edge"
+
+    browser = sys.argv[1].lower()
+
+    if browser == "chrome":
+        driver = get_Chrome_driver()
+    elif browser == "edge":
+        driver = get_Edge_driver()
+    elif browser == "firefox":
+        driver = get_Firexfox_driver()
+    else:
+        logger.error("Unrecognized browser. Please use 'chrome', 'edge' o 'firefox'.")
+        return
 
     logger.info("Starting the scraper.")
-    driver = webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()), options=options
-    )
 
     try:
         driver.get(CRAUTOS_BASE_PATH)
@@ -85,11 +98,62 @@ def main():
             except TimeoutException:
                 logger.info("No more pages left to process.")
                 break
+
+        # Add the logic to update the sold vehicles
+
     except Exception as e:
         logger.error(f"An error occurred: {e}")
     finally:
         driver.quit()
         logger.info("Closed the web driver.")
+
+
+def get_Chrome_driver():
+    options = webdriver.ChromeOptions()
+    options.add_argument("enable-automation")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--dns-prefetch-disable")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument("--disable-infobars")
+    options.add_argument("--disable-translate")
+
+    logger.info("Starting the scraper with Chrome.")
+    driver = webdriver.Chrome(
+        service=ChromeService(ChromeDriverManager().install()), options=options
+    )
+    return driver
+
+
+def get_Edge_driver():
+    options = webdriver.EdgeOptions()
+    options.add_argument("enable-automation")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--dns-prefetch-disable")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument("--disable-infobars")
+    options.add_argument("--disable-translate")
+
+    logger.info("Starting the scraper with Edge.")
+    driver = webdriver.Edge(
+        service=EdgeService(EdgeChromiumDriverManager().install()), options=options
+    )
+    return driver
+
+
+def get_Firexfox_driver():
+    options = webdriver.FirefoxOptions()
+    options.add_argument("--width=1920")
+    options.add_argument("--height=1080")
+
+    logger.info("Starting the scraper with Firefox.")
+    driver = webdriver.Firefox(
+        service=FirefoxService(GeckoDriverManager().install()), options=options
+    )
+    return driver
 
 
 def get_to_all_cars_list(driver):
@@ -131,6 +195,7 @@ def process_current_view_cars(driver):
                 logger.info(
                     f"Vehicle link {link} already exists in the database. Skipping."
                 )
+                existing_vehicle_urls.remove(link)
                 continue
             try:
                 vehicle_details = process_vehicle_card(driver, link)
