@@ -13,6 +13,8 @@ CREATE TABLE Cars (
     PriceColones DECIMAL(18, 2) NOT NULL,        -- Price in colones
     PriceDollars DECIMAL(18, 2),       -- Price in dollars
     EngineCapacity VARCHAR(50),         -- Engine capacity of the vehicle
+	BateryRange VARCHAR(50),         -- Engine capacity of the vehicle
+	BateryCapacity VARCHAR(50),         -- Engine capacity of the vehicle
     Style VARCHAR(50),                  -- Style of the vehicle
     Passengers INT,                     -- Number of passengers
     FuelType VARCHAR(50) NOT NULL,               -- Type of fuel

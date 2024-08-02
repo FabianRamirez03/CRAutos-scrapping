@@ -45,8 +45,20 @@ possible_brands = []
 def main():
     global existing_vehicle_urls
 
+    options = webdriver.ChromeOptions()
+    options.add_argument("enable-automation")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--dns-prefetch-disable")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument("--disable-infobars")
+    options.add_argument("--disable-translate")
+
     logger.info("Starting the scraper.")
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+    driver = webdriver.Chrome(
+        service=Service(ChromeDriverManager().install()), options=options
+    )
 
     try:
         driver.get(CRAUTOS_BASE_PATH)
@@ -102,7 +114,8 @@ def process_current_view_cars(driver):
         )
         logger.info(f"Found {len(vehicle_cards)} vehicle cards.")
     except Exception as e:
-        logger.error(f"An error occurred while processing vehicle card: {e}")
+        logger.error(f"An error occurred while processing vehicles view: {e}")
+        process_current_view_cars(driver)
 
     for index, card in enumerate(vehicle_cards):
         # Ignorar el último elemento
@@ -119,30 +132,23 @@ def process_current_view_cars(driver):
                     f"Vehicle link {link} already exists in the database. Skipping."
                 )
                 continue
+            try:
+                vehicle_details = process_vehicle_card(driver, link)
 
-            # Abrir el enlace en una nueva pestaña
-            driver.execute_script("window.open(arguments[0]);", link)
-            logger.info("Opened vehicle link in a new tab.")
+                if vehicle_exists(link):
+                    populate_date_exited(link)
+                    logger.info(f"Updated exit date for existing vehicle: {link}")
+                else:
+                    save_vehicle_details(vehicle_details)
+                    logger.info(f"Saved new vehicle details: {link}")
 
-            # Cambiar al nuevo contexto de la pestaña
-            driver.switch_to.window(driver.window_handles[1])
-            logger.info("Switched to new tab.")
-
-            vehicle_details = capture_vehicle_details(driver)
-
-            vehicle_details["URL"] = link
-
-            marca = vehicle_details.get("Marca")
-            modelo = vehicle_details.get("Modelo")
-            año = vehicle_details.get("Año")
-            logger.info(f"Captured details for vehicle: {marca} {modelo} {año}")
-
-            if vehicle_exists(link):
-                populate_date_exited(link)
-                logger.info(f"Updated exit date for existing vehicle: {link}")
-            else:
-                save_vehicle_details(vehicle_details)
-                logger.info(f"Saved new vehicle details: {link}")
+            except Exception as e:
+                logger.error(
+                    f"An error occurred while processing vehicle card for: {e}"
+                )
+                logger.info(f"Ignoring current vehicle. Processing next one")
+                driver.close()
+                continue
 
             # Cerrar la pestaña actual
             driver.close()
@@ -153,7 +159,29 @@ def process_current_view_cars(driver):
             logger.info("Switched back to original tab.")
 
         except Exception as e:
-            logger.error(f"An error occurred while processing vehicle card: {e}")
+            logger.error(f"An error occurred while processing vehicles cards view: {e}")
+
+
+def process_vehicle_card(driver, link):
+
+    # Abrir el enlace en una nueva pestaña
+    driver.execute_script("window.open(arguments[0]);", link)
+    logger.info("Opened vehicle link in a new tab.")
+
+    # Cambiar al nuevo contexto de la pestaña
+    driver.switch_to.window(driver.window_handles[1])
+    logger.info("Switched to new tab.")
+
+    vehicle_details = capture_vehicle_details(driver)
+
+    vehicle_details["URL"] = link
+
+    marca = vehicle_details.get("Marca")
+    modelo = vehicle_details.get("Modelo")
+    año = vehicle_details.get("Año")
+    logger.info(f"Captured details for vehicle: {marca} {modelo} {año}")
+
+    return vehicle_details
 
 
 def vehicle_exists(url):
@@ -213,8 +241,19 @@ def capture_vehicle_header_details(driver):
     logger.info("Capturing vehicle header details.")
 
     # Obtener el elemento del encabezado
-    header_element = driver.find_element(By.CSS_SELECTOR, ".carheader")
-    header_text = header_element.find_elements(By.TAG_NAME, "h1")
+    try:
+        # Esperar hasta que el elemento ".carheader" esté presente (máximo 5 segundos)
+        header_element = WebDriverWait(driver, 5).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, ".carheader"))
+        )
+
+        # Esperar hasta que los elementos "h1" dentro de ".carheader" estén presentes (máximo 5 segundos)
+        header_text = WebDriverWait(header_element, 5).until(
+            EC.presence_of_all_elements_located((By.TAG_NAME, "h1"))
+        )
+    except (TimeoutException, NoSuchElementException) as e:
+        logger.error(f"Error finding header element or text: {e}")
+        return None
 
     if header_text:
         # Obtener el texto del encabezado
@@ -491,12 +530,12 @@ def save_vehicle_details(vehicle_details):
                 """
                 INSERT INTO Cars (
                     Brand, Model, Year, PriceColones, PriceDollars,
-                    EngineCapacity, Style, Passengers, FuelType,
+                    EngineCapacity, BateryRange, BateryCapacity, Style, Passengers, FuelType,
                     Transmission, Condition, Mileage,
                     ExteriorColor, InteriorColor, Doors, TaxesPaid,
                     NegotiablePrice, AcceptsVehicle, Province,
                     Notes, DateEntered, DateExited, URL
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 (
                     vehicle_details.get("Marca"),
@@ -505,6 +544,8 @@ def save_vehicle_details(vehicle_details):
                     vehicle_details.get("PrecioColones"),
                     vehicle_details.get("PrecioDolares"),
                     vehicle_details.get("Cilindrada"),
+                    vehicle_details.get("Autonomía"),
+                    vehicle_details.get("Batería"),
                     vehicle_details.get("Estilo"),
                     vehicle_details.get("# de pasajeros"),
                     vehicle_details.get("Combustible"),
@@ -536,17 +577,15 @@ def save_vehicle_details(vehicle_details):
 
 def reformat_vehicle_details(vehicle_details):
     # Reformatear Cilindrada
-    if "Cilindrada" in vehicle_details:
-        vehicle_details["Cilindrada"] = vehicle_details["Cilindrada"].replace(" cc", "")
+    logger.info(f"Reformating Vehicle details: {vehicle_details}")
 
-    # Reformatear Traspaso
-    if "Traspaso" in vehicle_details:
-        traspaso_value = re.search(r"¢\s*([\d,]+)", vehicle_details["Traspaso"])
-        if traspaso_value:
-            vehicle_details["Traspaso"] = int(traspaso_value.group(1).replace(",", ""))
+    if "Cilindrada" in vehicle_details and vehicle_details["Cilindrada"] is not None:
+        logger.info("Reformating engine Capacity")
+        vehicle_details["Cilindrada"] = vehicle_details["Cilindrada"].replace(" cc", "")
 
     # Reformatear Fecha de ingreso
     if "Fecha de ingreso" in vehicle_details:
+        logger.info("Reformating DateEntered")
         date_str = vehicle_details["Fecha de ingreso"]
         # Convertir a formato de fecha
         try:
@@ -562,6 +601,7 @@ def reformat_vehicle_details(vehicle_details):
     # Reformatear Kilometraje
 
     if "Kilometraje" in vehicle_details:
+        logger.info("Reformating Mileage")
         mileage_value = re.search(
             r"([\d,]+)\s*(kms|millas)", vehicle_details["Kilometraje"], re.IGNORECASE
         )
@@ -581,6 +621,30 @@ def reformat_vehicle_details(vehicle_details):
         else:
             print(f"Kilometraje format error: {vehicle_details['Kilometraje']}")
             vehicle_details["Kilometraje"] = None  # O asignar un valor predeterminado
+
+    if "Autonomía" in vehicle_details and vehicle_details["Autonomía"] is not None:
+        logger.info("Reformating Autonomy")
+        autonomy_value = re.search(
+            r"([\d,]+)\s*(kms|millas)", vehicle_details["Autonomía"], re.IGNORECASE
+        )
+
+        if autonomy_value:
+            try:
+                # Convertir a entero, manejando posibles errores
+                autonomy = int(autonomy_value.group(1).replace(",", ""))
+                if "millas" in autonomy_value.group(2).lower():  # Si está en millas
+                    autonomy = int(autonomy * 1.60934)  # Convertir millas a kilómetros
+                vehicle_details["Autonomía"] = autonomy  # Guardar en kilómetros
+            except ValueError:
+                print(f"Invalid autonomy value: {vehicle_details['Autonomía']}")
+                vehicle_details["Autonomía"] = None  # O asignar un valor predeterminado
+        else:
+            print(f"Autonomy format error: {vehicle_details['Autonomía']}")
+            vehicle_details["Autonomía"] = None  # O asignar un valor predeterminado
+
+    if "Batería" in vehicle_details and vehicle_details["Batería"] is not None:
+        logger.info("Reformating Battery")
+        vehicle_details["Batería"] = vehicle_details["Batería"].replace(" kWh", "")
 
     return vehicle_details
 
