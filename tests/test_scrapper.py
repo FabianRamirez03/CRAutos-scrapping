@@ -36,6 +36,7 @@ def load_local_html(driver, file_name):
 def test_capture_vehicle_details_colones_listing(driver):
     load_local_html(driver, "Colones/Colones_Example.html")
     vehicle_details = capture_vehicle_details(driver)
+    print(vehicle_details)
     assert vehicle_details["Marca"] == "Volvo"
     assert vehicle_details["Modelo"] == "S60"
     assert vehicle_details["Año"] == "2012"
@@ -60,8 +61,9 @@ def test_capture_vehicle_details_colones_listing(driver):
 def test_capture_vehicle_details_dolares_listing(driver):
     load_local_html(driver, "Dollars/Dollars_example.html")
     vehicle_details = capture_vehicle_details(driver)
-    assert vehicle_details["Marca"] == "Mercedes"
-    assert vehicle_details["Modelo"] == "Benz B200"
+    print(vehicle_details)
+    assert vehicle_details["Marca"] == "Mercedes Benz"
+    assert vehicle_details["Modelo"] == "B200"
     assert vehicle_details["Año"] == "2013"
     assert vehicle_details["PrecioColones"] == 8075500
     assert vehicle_details["PrecioDolares"] == 15500

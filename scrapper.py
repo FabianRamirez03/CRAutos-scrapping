@@ -10,6 +10,7 @@ from selenium.common.exceptions import (
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from bs4 import BeautifulSoup
 import time
 import pyodbc
 import re
@@ -38,6 +39,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 existing_vehicle_urls = []
+possible_brands = []
 
 
 def main():
@@ -83,6 +85,9 @@ def get_to_all_cars_list(driver):
     find_used_cars_section(driver)
 
     scroll_to_bottom(driver)
+
+    global possible_brands
+    possible_brands = extract_brands_from_driver(driver)
 
     press_search_button(driver)
 
@@ -155,7 +160,7 @@ def vehicle_exists(url):
     try:
         with pyodbc.connect(
             driver="SQL Server",
-            server="FABIAN\SQLEXPRESS",
+            server="FABIAN\\SQLEXPRESS",
             database="CRAutos",
             trusted_connection="yes",
         ) as conn:
@@ -172,7 +177,7 @@ def populate_date_exited(url):
     try:
         with pyodbc.connect(
             driver="SQL Server",
-            server="FABIAN\SQLEXPRESS",
+            server="FABIAN\\SQLEXPRESS",
             database="CRAutos",
             trusted_connection="yes",
         ) as conn:
@@ -188,6 +193,114 @@ def populate_date_exited(url):
 
 
 def capture_vehicle_details(driver):
+    logger.info("Capturing vehicle details.")
+    vehicle_details = {}
+
+    header_details = capture_vehicle_header_details(driver)
+    fields_details = capture_vehicle_fields_details(driver)
+
+    vehicle_details.update(header_details)
+    vehicle_details.update(fields_details)
+
+    logger.info(vehicle_details)
+
+    return reformat_vehicle_details(vehicle_details)
+
+
+def capture_vehicle_header_details(driver):
+    global possible_brands
+    vehicle_details = {}
+    logger.info("Capturing vehicle header details.")
+
+    # Obtener el elemento del encabezado
+    header_element = driver.find_element(By.CSS_SELECTOR, ".carheader")
+    header_text = header_element.find_elements(By.TAG_NAME, "h1")
+
+    if header_text:
+        # Obtener el texto del encabezado
+        brand_model_year = header_text[0].text.strip()
+        # Dividir el texto en palabras
+        brand_model = brand_model_year.split()
+
+        # Buscar la marca en el texto utilizando la lista de marcas posibles
+        for brand in possible_brands:
+            # Verificar si el texto comienza con la marca
+            if brand_model_year.startswith(brand):
+                vehicle_details["Marca"] = brand
+
+                # Encontrar el año en el texto
+                for word in brand_model:
+                    if word.isdigit() and 1900 <= int(word) <= 2050:
+                        vehicle_details["Año"] = word
+                        break  # Salir del bucle una vez encontrado el año
+
+                # Asumir que el modelo es el texto restante después de quitar marca y año
+                if "Marca" in vehicle_details and "Año" in vehicle_details:
+                    # Obtener el texto restante después de la marca
+                    remaining_text = brand_model_year[len(brand) :].strip()
+
+                    # Eliminar el año del texto restante
+                    if vehicle_details["Año"] in remaining_text:
+                        remaining_text = remaining_text.replace(
+                            vehicle_details["Año"], ""
+                        ).strip()
+
+                    # Guardar el modelo
+                    vehicle_details["Modelo"] = remaining_text
+
+                break
+
+    logger.info(f"Brand found: {vehicle_details.get('Marca')}")
+    logger.info(f"Model found: {vehicle_details.get('Modelo')}")
+    logger.info(f"Year found: {vehicle_details.get('Año')}")
+    # Capturar precios en colones y dólares utilizando las nuevas funciones
+    price_colones = extract_price_colones(header_element)
+    if price_colones is not None:
+        vehicle_details["PrecioColones"] = price_colones
+
+    price_dolares = extract_price_dolares(header_element)
+    if price_dolares is not None:
+        vehicle_details["PrecioDolares"] = price_dolares
+
+    return vehicle_details
+
+
+def capture_vehicle_fields_details(driver):
+    vehicle_details = {}
+
+    fields = [
+        "Cilindrada",
+        "Estilo",
+        "# de pasajeros",
+        "Combustible",
+        "Transmisión",
+        "Estado",
+        "Kilometraje",
+        "Color exterior",
+        "Color interior",
+        "# de puertas",
+        "Ya pagó impuestos",
+        "Precio negociable",
+        "Se recibe vehículo",
+        "Provincia",
+        "Fecha de ingreso",
+        "Autonomía",
+        "Batería",
+    ]
+
+    for field in fields:
+        try:
+            element = driver.find_element(
+                By.XPATH, f"//td[contains(text(), '{field}')]/following-sibling::td"
+            )
+            vehicle_details[field] = element.text.strip()
+        except NoSuchElementException:
+            vehicle_details[field] = None
+
+    return vehicle_details
+
+
+def capture_vehicle_details_2(driver):
     # Un diccionario para almacenar los detalles del vehículo
     logger.info("Capturing vehicle details.")
     vehicle_details = {}
@@ -248,10 +361,25 @@ def capture_vehicle_details(driver):
     return reformat_vehicle_details(vehicle_details)
 
 
+def extract_brands_from_driver(driver):
+    html_content = driver.page_source
+    soup = BeautifulSoup(html_content, "html.parser")
+
+    brands = []
+    select_element = soup.find("select", {"name": "brand"})
+    if select_element:
+        options = select_element.find_all("option")
+        for option in options:
+            value = option.get("value")
+            if value and value != "00":  # Ignorar la opción "No Importa"
+                brand = option.text.strip()
+                brands.append(brand)
+    return brands
+
+
 def extract_price_colones(header_element):
     logger.info("Extracting price in colones from header element.")
 
-    # Buscar todos los elementos h1 y h3 dentro del div
     price_elements = header_element.find_elements(
         By.TAG_NAME, "h1"
     ) + header_element.find_elements(By.TAG_NAME, "h3")
@@ -260,16 +388,20 @@ def extract_price_colones(header_element):
         f"Found {len(price_elements)} price elements: {[element.text for element in price_elements]}"
     )
 
-    # Filtrar los elementos que contienen precios en colones
+    # Filtrar y convertir los elementos que contienen precios en colones
     colones_prices = []
     for element in price_elements:
-        text = element.text.strip()
+        text = (
+            element.text.strip().replace("(", "").replace(")", "").replace("*", "")
+        )  # Eliminar paréntesis
         if text.startswith("¢"):
-            colones_price = int(text.replace("¢", "").replace(",", "").strip())
+            colones_price = int(
+                text.replace("¢", "").replace(",", "").strip()
+            )  # Eliminar el signo de ¢ y comas
             colones_prices.append(colones_price)
             logger.info(f"Found colones price: {colones_price}")
 
-    # Si hay varios precios en colones, devolver el más bajo
+    # Si hay precios en colones, devolver el más bajo
     if colones_prices:
         min_price = min(colones_prices)
         logger.info(f"Lowest colones price found: {min_price}")
@@ -290,19 +422,27 @@ def extract_price_dolares(header_element):
         f"Found {len(price_elements)} price elements: {[element.text for element in price_elements]}"
     )
 
-    # Filtrar los elementos que contienen precios en dólares
+    # Filtrar y convertir los elementos que contienen precios en dólares
+    dolares_prices = []
     for element in price_elements:
-        text = element.text.strip()
-        if text.startswith("($"):
+        text = (
+            element.text.strip().replace("(", "").replace(")", "").replace("*", "")
+        )  # Eliminar paréntesis
+        if text.startswith("$"):
             dolares_price = int(
-                text.replace("($", "").replace(")*", "").replace(",", "").strip()
-            )
+                text.replace("$", "").replace(",", "").strip()
+            )  # Eliminar el signo de $ y comas
+            dolares_prices.append(dolares_price)
             logger.info(f"Found dollar price: {dolares_price}")
-            return dolares_price
 
-    # Si no se encuentra ningún precio en dólares, devolver None
-    logger.warning("No dollar prices found.")
-    return None
+    # Si hay precios en dólares, devolver el más bajo
+    if dolares_prices:
+        min_price = min(dolares_prices)
+        logger.info(f"Lowest dollar price found: {min_price}")
+        return min_price
+    else:
+        logger.warning("No dollar prices found.")
+        return None
 
 
 def get_existing_vehicle_urls():
@@ -311,7 +451,7 @@ def get_existing_vehicle_urls():
     try:
         with pyodbc.connect(
             driver="SQL Server",
-            server="FABIAN\SQLEXPRESS",
+            server="FABIAN\\SQLEXPRESS",
             database="CRAutos",
             trusted_connection="yes",
         ) as conn:
@@ -340,7 +480,7 @@ def save_vehicle_details(vehicle_details):
 
         with pyodbc.connect(
             driver="SQL Server",
-            server="FABIAN\SQLEXPRESS",
+            server="FABIAN\\SQLEXPRESS",
             database="CRAutos",
             trusted_connection="yes",
         ) as conn:
