@@ -57,7 +57,7 @@ possible_brands = []
 
 stop_processing = threading.Event()
 start_index = 0
-end_index = 0
+end_index = float("inf")
 
 
 def main():
@@ -71,6 +71,13 @@ def main():
         browser = "edge"
     else:
         browser = sys.argv[1].lower()
+
+    # get_all_data(browser)
+
+    check_sold_vehicle(browser)
+
+
+def get_all_data(browser):
 
     start_driver, end_driver = get_drivers(browser)
 
@@ -88,6 +95,8 @@ def main():
 
     thread_start.join()
     thread_end.join()
+
+    logger.info("Data Collection is done. No errors.")
 
 
 def process_from_start(driver):
@@ -125,6 +134,11 @@ def process_from_start(driver):
                 stop_processing.set()
 
             if start_index > end_index:
+                logger.info(f"start_index: {start_index}.")
+                logger.info(f"end_index: {end_index}.")
+                logger.info(
+                    "Start thread is same as End thread. Stopping parallel execution."
+                )
                 stop_processing.set()
 
     except Exception as e:
@@ -188,6 +202,9 @@ def process_from_end(driver):
                 stop_processing.set()
 
             if end_index < start_index:
+                logger.info(
+                    "End thread is same as Start thread. Stopping parallel execution."
+                )
                 stop_processing.set()
 
     except Exception as e:
@@ -196,6 +213,70 @@ def process_from_end(driver):
     finally:
         driver.quit()
         logger.info("Closed the web driver.")
+
+
+def check_sold_vehicle(browser):
+    driver, unnecesary_driver = get_drivers(browser)
+    unnecesary_driver.quit()
+    logger.info("Checking sold vehicles")
+    urls = get_unsold_vehicle_urls()
+    for url in urls:
+        try:
+            driver.get(url)
+            # Esperar hasta que el elemento esté presente
+            WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located(
+                    (
+                        By.CSS_SELECTOR,
+                        "a[href='#tab-1'].active[data-bs-toggle='tab'][aria-selected='true'][role='tab']",
+                    )
+                )
+            )
+            logger.info(f"Vehicle at {url} is still available.")
+        except (NoSuchElementException, Exception):
+            logger.info(f"Vehicle at {url} is no longer available. Updating exit date.")
+            update_vehicle_exit_date(url)
+
+    driver.quit()
+
+
+def update_vehicle_exit_date(url):
+    try:
+        with pyodbc.connect(
+            driver="SQL Server",
+            server="FABIAN\\SQLEXPRESS",
+            database="CRAutos",
+            trusted_connection="yes",
+        ) as conn:
+            with database_semaphore:
+                cursor = conn.cursor()
+                current_date = datetime.now()
+                cursor.execute(
+                    "UPDATE Cars SET dateExited = ? WHERE URL = ?", (current_date, url)
+                )
+                conn.commit()
+                cursor.close()
+    except pyodbc.Error as e:
+        logger.error(f"Database error: {e}")
+
+
+def get_unsold_vehicle_urls():
+    try:
+        with pyodbc.connect(
+            driver="SQL Server",
+            server="FABIAN\\SQLEXPRESS",
+            database="CRAutos",
+            trusted_connection="yes",
+        ) as conn:
+            with database_semaphore:
+                cursor = conn.cursor()
+                cursor.execute("SELECT URL FROM Cars WHERE dateExited IS NULL")
+                urls = cursor.fetchall()
+                cursor.close()
+                return [url.URL for url in urls]
+    except pyodbc.Error as e:
+        logger.error(f"Database error: {e}")
+        return []
 
 
 def get_current_page_index(driver):
@@ -303,7 +384,6 @@ def process_current_view_cars(driver):
                 vehicle_details = process_vehicle_card(driver, link)
 
                 if vehicle_exists(link):
-                    populate_date_exited(link)
                     logger.info(f"Updated exit date for existing vehicle: {link}")
                 else:
                     save_vehicle_details(vehicle_details)
@@ -365,6 +445,7 @@ def vehicle_exists(url):
                 cursor = conn.cursor()
                 cursor.execute("SELECT COUNT(*) FROM Cars WHERE URL = ?", url)
                 count = cursor.fetchone()[0]
+                cursor.close()
                 return count > 0
     except pyodbc.Error as e:
         logger.error(f"Error connecting to the database: {e}")
@@ -386,6 +467,7 @@ def populate_date_exited(url):
                 (today, url),
             )
             conn.commit()
+            cursor.close()
     except pyodbc.Error as e:
         logger.error(f"Error connecting to the database: {e}")
 
@@ -749,6 +831,7 @@ def save_vehicle_details(vehicle_details):
 
                 # Commit the transaction
                 conn.commit()
+                cursor.close()
 
     except pyodbc.Error as e:
         logger.error(f"Error connecting to the database: {e}")
