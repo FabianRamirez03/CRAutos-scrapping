@@ -24,6 +24,7 @@ import locale
 import logging
 import logging.config
 import sys
+import threading
 
 # GLOBALS
 
@@ -34,7 +35,7 @@ current_date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    format="%(asctime)s - %(threadName)s - %(levelname)s - %(message)s",
     handlers=[
         logging.FileHandler(f"logs\\car_scraper_{current_date}.log"),
         logging.StreamHandler(),
@@ -45,7 +46,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 existing_vehicle_urls = []
+existing_vehicle_urls_semaphore = threading.Lock()
+database_semaphore = threading.Lock()
+
 possible_brands = []
+
+stop_processing = threading.Event()
+start_index = 0
+end_index = 0
 
 
 def main():
@@ -62,17 +70,36 @@ def main():
         browser = sys.argv[1].lower()
 
     if browser == "chrome":
-        driver = get_Chrome_driver()
+        start_driver = get_Chrome_driver()
+        end_driver = get_Chrome_driver()
     elif browser == "edge":
-        driver = get_Edge_driver()
+        start_driver = get_Edge_driver()
+        end_driver = get_Edge_driver()
     elif browser == "firefox":
-        driver = get_Firexfox_driver()
+        start_driver = get_Firexfox_driver()
+        end_driver = get_Firexfox_driver()
     else:
         logger.error("Unrecognized browser. Please use 'chrome', 'edge' o 'firefox'.")
         return
 
     logger.info("Starting the scraper.")
 
+    thread_start = threading.Thread(
+        target=process_from_start, kwargs={"driver": start_driver}, name="StartThread"
+    )
+    thread_end = threading.Thread(
+        target=process_from_end, kwargs={"driver": end_driver}, name="EndThread"
+    )
+
+    thread_start.start()
+    thread_end.start()
+
+    thread_start.join()
+    thread_end.join()
+
+
+def process_from_start(driver):
+    global start_index, end_index, existing_vehicle_urls
     try:
         driver.get(CRAUTOS_BASE_PATH)
         logger.info("Navigated to base URL.")
@@ -80,12 +107,13 @@ def main():
         get_to_all_cars_list(driver)
         logger.info("Navigated to the list of all cars.")
 
-        page_index = 0
-
         existing_vehicle_urls = get_existing_vehicle_urls()
 
-        while True:
+        while not stop_processing.is_set():
             process_current_view_cars(driver)
+            start_index = get_current_page_index(driver)
+
+            # Going to next page
             try:
                 next_button = WebDriverWait(driver, 10).until(
                     EC.element_to_be_clickable(
@@ -93,23 +121,88 @@ def main():
                     )
                 )
                 driver.execute_script("arguments[0].click();", next_button)
-                page_index += 1
+                start_index += 1
 
-                # Obtener el URL actual
                 current_url = driver.current_url
-                logger.info(f"Clicked the next page button. Going to page {page_index}")
+                logger.info(
+                    f"Clicked the next page button. Going to page {start_index + 1}"
+                )
                 logger.info(f"Next page URL: {current_url}")
             except TimeoutException:
                 logger.info("No more pages left to process.")
-                break
+                stop_processing.set()
 
-        # Add the logic to update the sold vehicles
+            if start_index > end_index:
+                stop_processing.set()
 
     except Exception as e:
         logger.error(f"An error occurred: {e}")
+        stop_processing.set()
     finally:
         driver.quit()
         logger.info("Closed the web driver.")
+
+
+def process_from_end(driver):
+    global start_index, end_index, existing_vehicle_urls
+    try:
+        driver.get(CRAUTOS_BASE_PATH)
+        logger.info("Navigated to base URL.")
+
+        get_to_all_cars_list(driver)
+        logger.info("Navigated to the list of all cars.")
+
+        last_page_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable(
+                (By.CSS_SELECTOR, ".btn-xs.btn-success.pull-right")
+            )
+        )
+        driver.execute_script("arguments[0].click();", last_page_button)
+
+        existing_vehicle_urls = get_existing_vehicle_urls()
+
+        while not stop_processing.is_set():
+            process_current_view_cars(driver)
+
+            end_index = get_current_page_index(driver)
+            try:
+                next_button = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable(
+                        (By.CSS_SELECTOR, ".page-item.page-prev .page-link")
+                    )
+                )
+                driver.execute_script("arguments[0].click();", next_button)
+
+                current_url = driver.current_url
+                logger.info(
+                    f"Clicked the next page button. Going to page {end_index - 1}"
+                )
+                logger.info(f"Next page URL: {current_url}")
+            except TimeoutException:
+                logger.info("No more pages left to process.")
+                stop_processing.set()
+
+            if end_index < start_index:
+                stop_processing.set()
+
+    except Exception as e:
+        logger.error(f"An error occurred: {e}")
+        stop_processing.set()
+    finally:
+        driver.quit()
+        logger.info("Closed the web driver.")
+
+
+def get_current_page_index(driver):
+    current_page_element = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located(
+            (By.CSS_SELECTOR, ".page-item.active .page-link")
+        )
+    )
+
+    active_page_number = current_page_element.text.strip()
+
+    return int(active_page_number)
 
 
 def get_Chrome_driver():
@@ -199,7 +292,8 @@ def process_current_view_cars(driver):
                 logger.info(
                     f"Vehicle link {link} already exists in the database. Skipping."
                 )
-                existing_vehicle_urls.remove(link)
+                with existing_vehicle_urls_semaphore:
+                    existing_vehicle_urls.remove(link)
                 continue
             try:
                 vehicle_details = process_vehicle_card(driver, link)
@@ -227,8 +321,10 @@ def process_current_view_cars(driver):
 
         except Exception as e:
             logger.error(f"An error occurred while processing vehicles cards view: {e}")
-
-    logger.info(f"Current length of existing_vehicle_urls {len(existing_vehicle_urls)}")
+    with existing_vehicle_urls_semaphore:
+        logger.info(
+            f"Current length of existing_vehicle_urls {len(existing_vehicle_urls)}"
+        )
 
 
 def process_vehicle_card(driver, link):
@@ -261,10 +357,11 @@ def vehicle_exists(url):
             database="CRAutos",
             trusted_connection="yes",
         ) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM Cars WHERE URL = ?", url)
-            count = cursor.fetchone()[0]
-            return count > 0
+            with database_semaphore:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM Cars WHERE URL = ?", url)
+                count = cursor.fetchone()[0]
+                return count > 0
     except pyodbc.Error as e:
         logger.error(f"Error connecting to the database: {e}")
         return False
@@ -572,17 +669,19 @@ def get_existing_vehicle_urls():
         ) as conn:
             cursor = conn.cursor()
 
-            # Ejecutar la consulta
-            cursor.execute("SELECT URL FROM Cars")
+            with database_semaphore:
+                # Ejecutar la consulta
+                cursor.execute("SELECT URL FROM Cars")
 
-            # Obtener los resultados
-            rows = cursor.fetchall()
-            for row in rows:
-                existing_urls.append(row.URL)
+                # Obtener los resultados
+                rows = cursor.fetchall()
 
-            # Cerrar la conexión
-            cursor.close()
-            conn.close()
+                for row in rows:
+                    existing_urls.append(row.URL)
+
+                # Cerrar la conexión
+                cursor.close()
+                conn.close()
 
     except pyodbc.Error as e:
         logger.error(f"Database error: {e}")
@@ -599,53 +698,54 @@ def save_vehicle_details(vehicle_details):
             database="CRAutos",
             trusted_connection="yes",
         ) as conn:
-            cursor = conn.cursor()
+            with database_semaphore:
+                cursor = conn.cursor()
 
-            # Insert vehicle details into the Cars table
-            cursor.execute(
-                """
-                INSERT INTO Cars (
-                    Brand, Model, Year, PriceColones, PriceDollars,
-                    EngineCapacity, BateryRange, BateryCapacity, Style, Passengers, FuelType,
-                    Transmission, Condition, Mileage,
-                    ExteriorColor, InteriorColor, Doors, TaxesPaid,
-                    NegotiablePrice, AcceptsVehicle, Province,
-                    Notes, DateEntered, DateExited, URL
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-                (
-                    vehicle_details.get("Marca"),
-                    vehicle_details.get("Modelo"),
-                    vehicle_details.get("Año"),
-                    vehicle_details.get("PrecioColones"),
-                    vehicle_details.get("PrecioDolares"),
-                    vehicle_details.get("Cilindrada"),
-                    vehicle_details.get("Autonomía"),
-                    vehicle_details.get("Batería"),
-                    vehicle_details.get("Estilo"),
-                    vehicle_details.get("# de pasajeros"),
-                    vehicle_details.get("Combustible"),
-                    vehicle_details.get("Transmisión"),
-                    vehicle_details.get("Estado"),
-                    vehicle_details.get("Kilometraje"),
-                    vehicle_details.get("Color exterior"),
-                    vehicle_details.get("Color interior"),
-                    vehicle_details.get("# de puertas"),
-                    vehicle_details.get("Ya pagó impuestos"),
-                    vehicle_details.get("Precio negociable"),
-                    vehicle_details.get("Se recibe vehículo"),
-                    vehicle_details.get("Provincia"),
-                    vehicle_details.get(
-                        "Notas", ""
-                    ),  # Use an empty string if "Notas" not present
-                    vehicle_details.get("Fecha de ingreso"),
-                    vehicle_details.get("Fecha de salida"),
-                    vehicle_details.get("URL"),
-                ),
-            )
+                # Insert vehicle details into the Cars table
+                cursor.execute(
+                    """
+                    INSERT INTO Cars (
+                        Brand, Model, Year, PriceColones, PriceDollars,
+                        EngineCapacity, BateryRange, BateryCapacity, Style, Passengers, FuelType,
+                        Transmission, Condition, Mileage,
+                        ExteriorColor, InteriorColor, Doors, TaxesPaid,
+                        NegotiablePrice, AcceptsVehicle, Province,
+                        Notes, DateEntered, DateExited, URL
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        vehicle_details.get("Marca"),
+                        vehicle_details.get("Modelo"),
+                        vehicle_details.get("Año"),
+                        vehicle_details.get("PrecioColones"),
+                        vehicle_details.get("PrecioDolares"),
+                        vehicle_details.get("Cilindrada"),
+                        vehicle_details.get("Autonomía"),
+                        vehicle_details.get("Batería"),
+                        vehicle_details.get("Estilo"),
+                        vehicle_details.get("# de pasajeros"),
+                        vehicle_details.get("Combustible"),
+                        vehicle_details.get("Transmisión"),
+                        vehicle_details.get("Estado"),
+                        vehicle_details.get("Kilometraje"),
+                        vehicle_details.get("Color exterior"),
+                        vehicle_details.get("Color interior"),
+                        vehicle_details.get("# de puertas"),
+                        vehicle_details.get("Ya pagó impuestos"),
+                        vehicle_details.get("Precio negociable"),
+                        vehicle_details.get("Se recibe vehículo"),
+                        vehicle_details.get("Provincia"),
+                        vehicle_details.get(
+                            "Notas", ""
+                        ),  # Use an empty string if "Notas" not present
+                        vehicle_details.get("Fecha de ingreso"),
+                        vehicle_details.get("Fecha de salida"),
+                        vehicle_details.get("URL"),
+                    ),
+                )
 
-            # Commit the transaction
-            conn.commit()
+                # Commit the transaction
+                conn.commit()
 
     except pyodbc.Error as e:
         logger.error(f"Error connecting to the database: {e}")
