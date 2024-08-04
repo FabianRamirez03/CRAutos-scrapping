@@ -1,23 +1,5 @@
 # Imports
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.service import Service as ChromeService
-from selenium.webdriver.edge.service import Service as EdgeService
-from selenium.webdriver.firefox.service import Service as FirefoxService
-from webdriver_manager.chrome import ChromeDriverManager
-from webdriver_manager.microsoft import EdgeChromiumDriverManager
-from webdriver_manager.firefox import GeckoDriverManager
-from selenium.common.exceptions import (
-    NoSuchElementException,
-    ElementClickInterceptedException,
-)
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
-from bs4 import BeautifulSoup
 import time
-import pyodbc
 import re
 from datetime import datetime
 import locale
@@ -25,6 +7,28 @@ import logging
 import logging.config
 import sys
 import threading
+
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service as ChromeService
+from selenium.webdriver.edge.service import Service as EdgeService
+from selenium.webdriver.firefox.service import Service as FirefoxService
+from selenium.common.exceptions import (
+    NoSuchElementException,
+    ElementClickInterceptedException,
+    TimeoutException,
+)
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.microsoft import EdgeChromiumDriverManager
+from webdriver_manager.firefox import GeckoDriverManager
+
+from bs4 import BeautifulSoup
+
+import pyodbc
+
 
 # GLOBALS
 
@@ -57,7 +61,6 @@ end_index = 0
 
 
 def main():
-    global existing_vehicle_urls
 
     # Verificar si se pasó el navegador como argumento
     if len(sys.argv) < 2:
@@ -69,18 +72,7 @@ def main():
     else:
         browser = sys.argv[1].lower()
 
-    if browser == "chrome":
-        start_driver = get_Chrome_driver()
-        end_driver = get_Chrome_driver()
-    elif browser == "edge":
-        start_driver = get_Edge_driver()
-        end_driver = get_Edge_driver()
-    elif browser == "firefox":
-        start_driver = get_Firexfox_driver()
-        end_driver = get_Firexfox_driver()
-    else:
-        logger.error("Unrecognized browser. Please use 'chrome', 'edge' o 'firefox'.")
-        return
+    start_driver, end_driver = get_drivers(browser)
 
     logger.info("Starting the scraper.")
 
@@ -141,6 +133,19 @@ def process_from_start(driver):
     finally:
         driver.quit()
         logger.info("Closed the web driver.")
+
+
+def get_drivers(browser):
+    if browser == "chrome":
+        start_driver = get_Chrome_driver()
+        end_driver = get_Chrome_driver()
+    elif browser == "edge":
+        start_driver = get_Edge_driver()
+        end_driver = get_Edge_driver()
+    elif browser == "firefox":
+        start_driver = get_Firexfox_driver()
+        end_driver = get_Firexfox_driver()
+    return start_driver, end_driver
 
 
 def process_from_end(driver):
@@ -266,7 +271,6 @@ def get_to_all_cars_list(driver):
 
 
 def process_current_view_cars(driver):
-    global existing_vehicle_urls
 
     logger.info("Processing current view of cars.")
     try:
@@ -402,7 +406,6 @@ def capture_vehicle_details(driver):
 
 
 def capture_vehicle_header_details(driver):
-    global possible_brands
     vehicle_details = {}
     logger.info("Capturing vehicle header details.")
 
@@ -413,7 +416,6 @@ def capture_vehicle_header_details(driver):
             EC.presence_of_element_located((By.CSS_SELECTOR, ".carheader"))
         )
 
-        # Esperar hasta que los elementos "h1" dentro de ".carheader" estén presentes (máximo 5 segundos)
         header_text = WebDriverWait(header_element, 5).until(
             EC.presence_of_all_elements_located((By.TAG_NAME, "h1"))
         )
@@ -594,7 +596,8 @@ def extract_price_colones(header_element):
     )
 
     # Expresión regular para encontrar precios en colones
-    colones_price_pattern = r"¢\s*([\d,]+)(?=\s|\)|$)"  # Busca ¢ seguido de un número, delimitado por un espacio, paréntesis o fin de línea
+    # Busca ¢ seguido de un número, delimitado por un espacio, paréntesis o fin de línea
+    colones_price_pattern = r"¢\s*([\d,]+)(?=\s|\)|$)"
 
     colones_prices = []
     for element in price_elements:
@@ -652,9 +655,9 @@ def extract_price_dolares(header_element):
         min_price = min(dolares_prices)
         logger.info(f"Lowest dollar price found: {min_price}")
         return min_price
-    else:
-        logger.warning("No dollar prices found.")
-        return None
+
+    logger.warning("No dollar prices found.")
+    return None
 
 
 def get_existing_vehicle_urls():
