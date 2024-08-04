@@ -72,7 +72,7 @@ def main():
     else:
         browser = sys.argv[1].lower()
 
-    # get_all_data(browser)
+    get_all_data(browser)
 
     check_sold_vehicle(browser)
 
