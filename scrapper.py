@@ -58,8 +58,8 @@ def main():
         )
         logger.info("Setting Edge as default browser.")
         browser = "edge"
-
-    browser = sys.argv[1].lower()
+    else:
+        browser = sys.argv[1].lower()
 
     if browser == "chrome":
         driver = get_Chrome_driver()
@@ -94,7 +94,11 @@ def main():
                 )
                 driver.execute_script("arguments[0].click();", next_button)
                 page_index += 1
+
+                # Obtener el URL actual
+                current_url = driver.current_url
                 logger.info(f"Clicked the next page button. Going to page {page_index}")
+                logger.info(f"Next page URL: {current_url}")
             except TimeoutException:
                 logger.info("No more pages left to process.")
                 break
@@ -212,8 +216,6 @@ def process_current_view_cars(driver):
                     f"An error occurred while processing vehicle card for: {e}"
                 )
                 logger.info(f"Ignoring current vehicle. Processing next one")
-                driver.close()
-                continue
 
             # Cerrar la pestaña actual
             driver.close()
