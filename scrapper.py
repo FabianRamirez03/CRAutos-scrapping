@@ -7,6 +7,7 @@ import logging
 import logging.config
 import sys
 import threading
+import random
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -52,6 +53,7 @@ logger = logging.getLogger(__name__)
 existing_vehicle_urls = []
 existing_vehicle_urls_semaphore = threading.Lock()
 database_semaphore = threading.Lock()
+sold_vehicles_semaphore = threading.Semaphore()
 
 possible_brands = []
 
@@ -72,9 +74,24 @@ def main():
     else:
         browser = sys.argv[1].lower()
 
+    start_time = time.time()
+
     get_all_data(browser)
 
     check_sold_vehicle(browser)
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+
+    logger.info(
+        f"The whole script took {format_elapsed_time(elapsed_time)} to complete."
+    )
+
+
+def format_elapsed_time(seconds):
+    hours, remainder = divmod(seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
 
 
 def get_all_data(browser):
@@ -215,12 +232,15 @@ def process_from_end(driver):
         logger.info("Closed the web driver.")
 
 
-def check_sold_vehicle(browser):
-    driver, unnecesary_driver = get_drivers(browser)
-    unnecesary_driver.quit()
-    logger.info("Checking sold vehicles")
-    urls = get_unsold_vehicle_urls()
-    for url in urls:
+def process_urls(driver, urls):
+    while True:
+        with sold_vehicles_semaphore:
+            if not urls:
+                break
+            logger.info(f"Pending Vehicles to check availability: {len(urls)}")
+            url = random.choice(urls)
+            urls.remove(url)
+
         try:
             driver.get(url)
             # Esperar hasta que el elemento esté presente
@@ -237,7 +257,29 @@ def check_sold_vehicle(browser):
             logger.info(f"Vehicle at {url} is no longer available. Updating exit date.")
             update_vehicle_exit_date(url)
 
-    driver.quit()
+
+def check_sold_vehicle(browser):
+    driver_A, driver_B = get_drivers(browser)
+    driver_C, driver_D = get_drivers(browser)
+
+    drivers = [driver_A, driver_B, driver_C, driver_D]
+
+    logger.info("Checking sold vehicles")
+
+    urls = get_unsold_vehicle_urls()
+
+    threads = []
+
+    for driver in drivers:
+        thread = threading.Thread(target=process_urls, args=(driver, urls))
+        thread.start()
+        threads.append(thread)
+
+    for thread in threads:
+        thread.join()
+
+    for driver in drivers:
+        driver.quit()
 
 
 def update_vehicle_exit_date(url):
