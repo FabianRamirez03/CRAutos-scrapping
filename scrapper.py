@@ -8,6 +8,7 @@ import logging.config
 import sys
 import threading
 import random
+import os
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -86,6 +87,8 @@ def main():
     logger.info(
         f"The whole script took {format_elapsed_time(elapsed_time)} to complete."
     )
+
+    os.system("shutdown -s -t 0")
 
 
 def format_elapsed_time(seconds):
